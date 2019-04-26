@@ -1,0 +1,230 @@
+Operations that need to be done on the population of Genomes
+
+	0) Apply heuristic to every genome						-> O(n) time always.
+	1) Find min fitness genome. 							-> need to either sort the entire genome or iterate through entire thing O(n log n)
+	2) delete/relace the least-fit half of population		-> need to sort the entire genome to remove least-fit 50 O(n log n)
+	3) randomly access Genomes.								-> need good random access -> store as ArrayList
+	
+	
+	
+	Tree implementation - Not ideal, given a promise of a Genome size of 100, complex data structures and sorting algorithms may
+	not perform optimally. But why not try it with a tree first? 
+
+	public static class PopTree<T extends Comparable<T>> {
+
+		private static class Node<T extends Comparable<T>> {
+
+			public T nodeFace;
+			public Genome nodeData; 
+			public int cloneQuantity = 0;
+
+			public Node<T> leftNode;
+			public Node<T> cloneNode;
+			public Node<T> rightNode;
+
+			public Node(final T theFace, final Genome theData) {
+				nodeFace = theFace;
+				nodeData = theData;
+			}
+
+			public boolean add(final T theNodeFace, final Genome theNodeData) {
+				//three cases, greater, equal, and less than
+				int comp = theNodeFace.compareTo(nodeFace);
+
+				if (comp == 1) {
+					if (rightNode == null) {
+						rightNode = new Node<T>(theNodeFace, theNodeData);
+						return true;
+					} else {
+						return rightNode.add(theNodeFace, theNodeData);
+					}
+				} else if (comp == 0) {
+					if (cloneNode == null) {
+						cloneNode = new Node<T>(theNodeFace, theNodeData);
+						cloneQuantity++;
+						return true;
+					} else {
+						cloneQuantity++;
+						return cloneNode.add(theNodeFace, theNodeData);
+					}
+				} else {
+					if (leftNode == null) {
+						leftNode = new Node<T>(theNodeFace, theNodeData);
+						return true;
+					} else {
+						return leftNode.add(theNodeFace, theNodeData);
+					}
+				}
+
+			}
+
+			public Genome removeMin(final Node<T> parent, final boolean isParentLarger) {
+
+				if (leftNode != null) {
+					//we have a left child to go to
+					return leftNode.removeMin(this, true);
+				} else {
+					if (cloneQuantity > 0) {
+						//we have a clone to promote
+						Genome toReturn = nodeData;
+						nodeData = cloneNode.nodeData;
+						cloneNode = cloneNode.cloneNode;
+						cloneQuantity--;
+						return toReturn;
+
+					} else {
+						//no right children
+						if (rightNode == null) {
+							Genome toReturn = nodeData;
+							if (isParentLarger) {
+								parent.leftNode = null;
+								return toReturn;
+							} else {
+								parent.rightNode = null;
+								return toReturn;
+							}
+						} else {
+							//we have a right child to promote
+							Genome toReturn = nodeData;
+							if (isParentLarger) {
+								parent.leftNode = rightNode;
+								return toReturn;
+							} else {
+								parent.rightNode = rightNode;
+								return toReturn;
+							}
+						}
+					}
+
+
+				}
+			}
+
+
+
+		}
+
+		private Node<T> root;
+
+		private int size = 0; 
+
+		public boolean add(T theFace, Genome theGenes) {
+			if (root == null) {
+				root = new Node<T>(theFace, theGenes);
+				size++;
+				return true;
+			} else {
+				size++;
+				return root.add(theFace, theGenes);
+			}
+		}
+
+		public Genome removeMin() {
+			if (root.leftNode == null && root.cloneNode == null && root.rightNode == null) {
+				//there are no children, root will become null
+				Genome toReturn = root.nodeData;
+				size--;
+				root = null;
+				return toReturn;
+			} else if (root.leftNode == null && root.cloneNode == null) {
+				//we have a right child to promote
+				Genome toReturn = root.nodeData;
+				size--;
+				root = root.rightNode;
+				return toReturn;
+			} else {
+				//we have a left child or a clone to deal with.
+				size--;
+				return root.removeMin(root, false);
+			}
+		}
+
+		public int getSize() {
+			return size;
+		}
+
+	}
+	
+	
+	
+The if else for working with the tree implementation:
+
+else {
+			PopTree<Integer> pop = new PopTree<Integer>();
+
+			for (int i = 0; i < geneList.size(); i++) {
+				pop.add(geneList.get(i).fitness(), geneList.get(i));
+			}
+			int geneHalfSize = (int) (geneList.size() / 2);
+
+			geneList = new ArrayList<Genome>();
+
+			mostFit = pop.removeMin();
+			geneList.add(mostFit);
+			for (int i = 1; i < (int) geneHalfSize; i++) {
+				geneList.add(pop.removeMin()); //TODO: currently this is worst case n^2 (avg n log n),
+				//can we have a pointer to the min node? then it's down to n time?
+			}
+
+
+			//we now have a geneList that contains the half with the best fitness.
+
+
+			while (geneList.size() < (int) (geneHalfSize * 2)) {
+				int randoIndex = (int) (Math.random() * geneHalfSize);
+				Genome gene = new Genome(geneList.get(randoIndex));
+				if (Math.random() >= 0.5) {
+					gene.mutate();
+					geneList.add(gene);
+				} else {
+					int randoOtherIndex = (int) (Math.random() * geneHalfSize);
+					gene.crossover(geneList.get(randoOtherIndex));
+					gene.mutate();
+					geneList.add(gene);
+				}
+			}
+
+
+		}
+	
+	
+	
+	
+	
+	
+	
+		protected static void treeTest() {
+		PopTree<Integer> popTree = new PopTree<Integer>();
+		for (int i = 1; i <= 100; i++) {
+			Genome gene = new Genome(0.05);
+			popTree.add(gene.fitness(), gene);
+		}
+
+		System.out.println(popTree.size + " Size");
+		for (int i = 99; i >= 0; i--) {
+			if (i == 0) {
+				System.out.println("Last");
+			}
+			System.out.println(popTree.removeMin().toString());
+			System.out.println(popTree.size + " Size");
+		}
+
+		System.out.println();
+		int size = 300;
+
+		for (int i = 1; i <= size; i++) {
+			Genome gene = new Genome(0.5);
+			gene.mutate();
+			gene.mutate();
+			System.out.println("Gene: " + gene.toString());
+			popTree.add(gene.fitness(), gene);
+		}
+
+		System.out.println(popTree.size + " Size");
+
+		for (int i = size; i >= 1; i--) {
+			Genome poo = popTree.removeMin();
+			System.out.println("Gene: " + poo.toString() + " Size: " + popTree.size);
+		}
+
+	}
